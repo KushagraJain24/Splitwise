@@ -308,7 +308,11 @@ class AuthProvider extends ChangeNotifier {
         str.contains('canceled') ||
         str.contains('12501') ||
         str.contains('abort') ||
-        str.contains('sign_in_canceled')) {
+        str.contains('sign_in_canceled') ||
+        str.contains('popup-closed-by-user') ||
+        str.contains('popup_closed_by_user') ||
+        str.contains('cancelled-popup-request') ||
+        str.contains('closed')) {
       return null;
     }
 

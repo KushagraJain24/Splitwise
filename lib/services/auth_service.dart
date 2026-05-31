@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:splitwise/models/user_model.dart';
 import 'package:splitwise/services/db_service.dart';
 
@@ -235,30 +236,37 @@ class AuthService {
   Future<UserModel> signInWithGoogle() async {
     if (isFirebaseEnabled()) {
       try {
-        // Ensure initialization for v7+ singleton
-        await GoogleSignIn.instance.initialize();
+        final UserCredential creds;
+        if (kIsWeb) {
+          final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+          creds = await _firebaseAuth.signInWithPopup(googleProvider);
+        } else {
+          // Ensure initialization for v7+ singleton
+          await GoogleSignIn.instance.initialize();
 
-        // Trigger Google Sign-In flow
-        final GoogleSignInAccount? googleUser = await GoogleSignIn.instance.authenticate();
-        if (googleUser == null) {
-          throw Exception("Google sign in cancelled by user");
+          // Trigger Google Sign-In flow
+          final GoogleSignInAccount? googleUser = await GoogleSignIn.instance.authenticate();
+          if (googleUser == null) {
+            throw Exception("Google sign in cancelled by user");
+          }
+
+          // Obtain auth details from request
+          final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+          final AuthCredential credential = GoogleAuthProvider.credential(
+            idToken: googleAuth.idToken,
+          );
+
+          // Authenticate with Firebase
+          creds = await _firebaseAuth.signInWithCredential(credential);
         }
 
-        // Obtain auth details from request
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        final AuthCredential credential = GoogleAuthProvider.credential(
-          idToken: googleAuth.idToken,
-        );
-
-        // Authenticate with Firebase
-        final UserCredential creds = await _firebaseAuth.signInWithCredential(credential);
         if (creds.user == null) {
           throw Exception("Firebase Google authentication failed");
         }
 
         final uid = creds.user!.uid;
-        final email = (creds.user!.email ?? googleUser.email).trim().toLowerCase();
-        final displayName = creds.user!.displayName ?? googleUser.displayName ?? 'Google User';
+        final email = (creds.user!.email ?? '').trim().toLowerCase();
+        final displayName = creds.user!.displayName ?? 'Google User';
 
         // Check if user profile already exists
         var profile = await DbService().getUserProfile(uid);
