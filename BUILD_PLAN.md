@@ -1,138 +1,84 @@
-# Build Plan: Splitwise MVP (Flutter + Firebase)
+# Build Plan - Splitwise Clone App 💸
 
-This build plan outlines the product analysis, scope, technical architecture, and development stages for building a beautiful, fully functional Splitwise clone in 3 days.
+This document details the development lifecycle, product decisions, architectural schema, AI pair-programming process, and engineering tradeoffs made during the creation of this Splitwise clone.
 
 ---
 
 ## 1. Product Research
-* **How We Studied Splitwise:**
-  * Analyzed core features: User balances, direct expenses, group expenses, settlements ("Settle Up"), expense categories, and debt simplification ("Simplify Debts").
-  * Studied the mathematical balance calculation: how each transaction affects individual and group-wide net balances.
-* **What We Learned:**
-  * At its core, Splitwise is a ledger. Every expense has a payer who adds a positive credit to their ledger, and split members who add a negative debit.
-  * Direct 1-on-1 expenses can be modeled like group expenses but with a `groupId = null` and a direct friend association.
-  * High-quality UX is essential. Splitwise has clear green (you are owed) and orange (you owe) signifiers, clean transaction streams, and simple modal dialogs.
-* **Workflows Identified:**
-  * Auth (Sign Up / Login).
-  * Dashboard (Overall balances summary, groups list, friends list, quick-add expense button).
-  * Group Details (Group members, scrollable history of expenses/settlements, debt summary, basic analytics chart).
-  * Add Expense (Description, amount, payer, split strategy picker - Equal, Exact, Percent, Shares).
-  * Settle Up (Record payment between two users via cash or mock online UPI payment).
-* **Product Assumptions Made:**
-  * Trust-based: No dispute resolutions or invoice validation required.
-  * Single currency: INR (₹) simplifies calculations and UI.
-  * Registration claims: A user can add an email that isn't registered yet; a "placeholder" is created, which can be claimed later.
+
+### How We Studied Splitwise
+We analyzed the core features of the official Splitwise mobile and web applications, paying close attention to:
+- **Ledger Balances:** How Splitwise represents who owes whom, focusing on group vs. individual balances.
+- **Settlement Workflows:** The mechanics of recording payments, simplifying debts, and settling up.
+- **User Invitation Pipeline:** How users invite contacts by email or phone numbers, how mock accounts are set up, and how these invite histories are merged when real profiles are registered.
+- **Expense Creation Forms:** Split equations (equal, exact value), currency inputs, category labels, and date records.
+
+### Key Learnings
+- **Debts are Relational:** A single person owes money across multiple groups and direct relationships. Merely summing balances per group/friend separately results in duplicates and confusion.
+- **Casing & Formats Cause Fragmentation:** If users register with mixed-case emails (e.g. `User@Example.com`) or variations in phone prefixes (`+91`, `0`, or without country codes), standard database queries fail. Data must be sanitized upon model initialization.
+- **Claiming History requires Cascading Updates:** When a placeholder user becomes a real registered user, all group memberships, transaction logs, payers, split keys, and direct relationships must migrate to the new UID.
+
+### Product Assumptions
+- **USD base schema:** All db transactions are stored in USD internally, allowing real-time currency conversions when fetching INR/EUR rates.
+- **Offline first:** Speed is a key metric. Local caching of data via `SharedPreferences` ensures instant rendering on boot.
 
 ---
 
 ## 2. Final Scope
-### What We Chose to Build
-1. **User Authentication:** Email + Password signup/login with Firebase Auth.
-2. **Dashboard Screen:** High-fidelity dashboard displaying overall balance stats, groups, and friends.
-3. **Groups & Friends management:** Group creation, member search by email, placeholder accounts for invitations.
-4. **Expense System:** Detailed expense creator supporting **Equal, Exact, Percentage, and Shares** splits.
-5. **On-the-fly Balance Calculation:** Accurate ledger parsing to calculate who owes who.
-6. **Simplify Debts Algorithm:** Greedy algorithm to minimize transactions.
-7. **Settle Up flow:** Cash and mock UPI payments.
-8. **Basic Analytics:** Interactive expense pie-chart inside group dashboards.
-9. **Rich Aesthetics:** Modern Flutter design with dark/light themes, smooth transitions, custom charts, and glassmorphic cards.
-10. **Deployment:** Flutter Web deployed to Firebase Hosting.
 
-### What We Chose Not to Build
-* Multi-currency support (postponed).
-* OCR / Receipt Scanning (out of scope for 3-day timeline).
-* Real payment gateways (Mock payment only).
-* Chat / comments on expenses.
-* Push notifications.
+### In Scope
+- **Dynamic Group Customization:**
+  - **Trip / Family:** Normal group splitting, balances tab, and charts tab.
+  - **Self:** Personal budget logger that tracks personal purchases without splits.
+  - **No Expense:** Simplifies transaction aggregation (direct 1-on-1 balances).
+- **Group Notes 📝:** Option to share, read, and write persistent group announcements.
+- **Cross-Group Settlements:** A single settlement action distributed across mutual group debts first before direct debts.
+- **Linking & Self-Healing:** Seamless link between email and last-10-digit phone variations, with automated duplicate merging.
+- **Aesthetic Premium UI:** Animated splash page, curated dark gradients, glassmorphism, illustration avatars, and gold notification center indicators.
 
-### Why This is Achievable in 3 Days
-* **Firebase Backend:** Using Firebase Auth and Firestore removes the need to build a custom database backend, write authentication microservices, or configure servers/Docker.
-* **On-the-fly Ledger Calculations:** Computing balances in-memory from queried logs prevents database sync complexity.
-* **Pre-scoped MVP:** Removing push notifications and real payment integrations allows focusing 100% on the core ledger logic and the premium UI.
+### Out of Scope
+- **Real Payment Integrations:** Standard UPI/card payments are replaced with mock manual settlement records.
+- **Optical Character Recognition (OCR):** Receipt scanning is excluded.
+- **Real-Time Push Notifications:** Replaced with localized in-app reminders logged to activity feeds.
 
 ---
 
 ## 3. Architecture
 
 ### Tech Stack
-* **Frontend:** Flutter (Dart) for high-performance responsive web/mobile UI.
-* **Backend & Database:** Firebase Auth & Cloud Firestore.
-* **State Management:** Provider pattern in Flutter.
-* **Deployment:** Firebase Hosting (fast CDN and instant deployment).
+- **Frontend Framework:** Flutter & Dart (Single codebase for Web, Android, iOS).
+- **State Management:** Provider (highly reactive, lightweight).
+- **Database & Auth:** Firebase Auth & Cloud Firestore.
+- **Local Storage:** SharedPreferences (Offline caching).
 
 ### Database Schema (Firestore)
-* `/users`: Document per registered/placeholder user.
-* `/users/{userId}/friends`: Friend records.
-* `/groups`: Group information and list of member details.
-* `/expenses`: Transaction log for expenses and settlements.
-
-### API / Firestore Rules Design
-Since we use Firebase SDK directly in Flutter, our "API" is the Firestore query interface.
-* **Fetch Groups:** `firestore.collection('groups').where('members', arrayContains: currentUserId)`
-* **Fetch Group Expenses:** `firestore.collection('expenses').where('groupId', '==', groupId).orderBy('createdAt', descending: true)`
-* **Fetch Direct Expenses:** `firestore.collection('expenses').where('groupId', '==', null).where('members', arrayContains: currentUserId)`
-
-### Frontend Structure (Flutter App Structure)
-```
-lib/
-├── main.dart                 # App Entry Point & Theme Configuration
-├── models/
-│   ├── user_model.dart       # User & Placeholder models
-│   ├── group_model.dart      # Group model
-│   ├── expense_model.dart    # Expense & Split details
-│   └── settlement_model.dart # Settlement details
-├── services/
-│   ├── auth_service.dart     # Firebase Authentication service
-│   ├── db_service.dart       # Firestore read/write & query operations
-│   └── debt_service.dart     # Simplify Debts & Balance calculation logic
-├── providers/
-│   ├── auth_provider.dart    # Authentication state
-│   └── app_provider.dart     # Group, Expense, and Friend states
-├── screens/
-│   ├── auth/
-│   │   ├── login_screen.dart
-│   │   └── signup_screen.dart
-│   ├── dashboard/
-│   │   ├── dashboard_screen.dart
-│   │   └── widgets/
-│   │       ├── balance_card.dart
-│   │       └── group_list_item.dart
-│   ├── group/
-│   │   ├── group_detail_screen.dart
-│   │   ├── create_group_screen.dart
-│   │   └── widgets/
-│   │       ├── expense_history_list.dart
-│   │       └── debt_simplification_card.dart
-│   ├── expense/
-│   │   ├── add_expense_screen.dart
-│   │   └── widgets/
-│   │       └── split_strategy_selector.dart
-│   └── settlement/
-│       └── settle_up_screen.dart
-└── utils/
-    ├── constants.dart        # Currency (INR) and Theme Styling constants
-    └── helpers.dart          # Rounding and formatting helpers
-```
+- **`users` Collection:**
+  - `uid` (String), `email` (String - always lowercase), `displayName` (String), `phone` (String - sanitized digits), `photoUrl` (String), `isPlaceholder` (Boolean), `createdAt` (Timestamp).
+  - Subcollection `friends`: Holds user document structures representing reciprocal friendships.
+- **`groups` Collection:**
+  - `groupId` (String), `name` (String), `description` (String), `createdBy` (String), `createdAt` (Timestamp), `members` (Array of UIDs), `memberDetails` (Map of UID keys to displayName, email, isPlaceholder), `type` (String: TRIP/FAMILY/SELF/NO_EXPENSE), `deletedAt` (Timestamp).
+  - Subcollection `notes`: `noteId` (String), `content` (String), `createdBy` (String), `createdByName` (String), `createdAt` (Timestamp).
+- **`expenses` Collection:**
+  - `expenseId` (String), `groupId` (String? - null for direct), `friendId` (String? - for direct), `description` (String), `amount` (Double - stored in USD), `paidBy` (String), `splitType` (String), `splits` (Map of UID keys to SplitDetail map), `isSettlement` (Boolean), `createdAt` (Timestamp), `createdBy` (String), `deletedAt` (Timestamp).
 
 ---
 
 ## 4. AI Collaboration Process
-* **How the AI Instructed / Interviewed:**
-  * The AI started by posing detailed questions across 6 core areas (goals, scope, database, auth, stack, edge cases).
-* **How the User Answered:**
-  * Selected Flutter + Firebase.
-  * Defined core MVP flow (Register/Login -> Dashboard -> Group creation -> Expense splits -> Settle Up -> Balances).
-  * Selected specific split strategies (Equal, Exact, Percent, Shares) and required a "Simplify Debts" implementation.
-  * Specified single currency (INR) and manual settlement flows.
-  * Standardized edge case handling (last user gets rounding remainder, soft deletes only, leaving group restricted).
-* **Evolution of the Plan:**
-  * Upgraded backend choice from custom server to Firebase to hit the 3-day deadline.
-  * Defined schema mapping for Firestore, adding denormalized metadata (`memberDetails` in Groups) to prevent Firestore N+1 query limits.
+
+### AI Instruction Style
+We used a sequential pair-programming approach:
+1. **Planning Phase:** Outlining new features using markdown `implementation_plan.md` plans before coding to ensure complete alignments.
+2. **Modular Edits:** Editing distinct layers (models first, database services second, provider state manager third, UI fourth).
+3. **Continuous Testing:** Running automated testing (`flutter test`) at the end of every change to prevent code regressions.
+
+### Context Maintenance
+- The **`AI_CONTEXT.md`** file was continuously updated at the end of each session. This ensured a persistent changelog, design rules, and schema decisions were propagated across compilation Compacts.
 
 ---
 
-## 5. Tradeoffs & Decisions
-* **Ledger Computations:** In-memory recalculation of balances on load rather than triggering database updates for each transaction. Highly robust against concurrency but requires pagination/limits for huge transaction lists.
-* **Placeholder Accounts:** When adding a new member by email, a placeholder is auto-created. This prevents blocking group actions for unregistered users, but requires a clean email-linking script on sign-up.
-* **No Real-Time Gateways:** Settle Up works virtually. This speeds up compliance and development, but relies on users self-reporting.
-* **No Edit after Settlement:** To prevent complex audit discrepancies, expenses cannot be edited if group balances have been altered by settlements.
+## 5. Tradeoffs & Simplifications
+
+- **USD Base Schema:** Simplifies ledger calculations. Instead of handling multiple currencies inside the database splits, all transactions are stored in USD and converted to INR/EUR values at runtime using active rates.
+- **Subcollection Querying fallbacks:** Since Firestore lacks case-insensitive indexing, we implemented case-insensitive checks in Dart, fetching placeholder profiles and performing secondary string evaluations on the client-side.
+- **Manual Web Contacts:** Native contact queries are supported on Android and iOS, but falls back to manual browser-native custom contact staging on Desktop/Web to bypass package constraints.
+- **Future Improvements:** With more time, we would implement cloud functions to batch update claimed placeholders instead of performing client-side Firestore batches.

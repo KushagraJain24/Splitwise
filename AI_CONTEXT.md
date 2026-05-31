@@ -1,6 +1,6 @@
 # AI Context: Splitwise Clone MVP
 
-This document serves as the single source of truth for the project. It tracks product goals, scope, requirements, architectural decisions, API designs, schemas, and implementation history.
+This document serves as the single source of truth for the project. It tracks product goals, scope, requirements, architectural decisions, API designs, schemas, and implementation history. It is designed to be detailed enough for any developer or AI agent to rebuild the same app and arrive at a similar codebase.
 
 ---
 
@@ -13,58 +13,98 @@ This document serves as the single source of truth for the project. It tracks pr
 ---
 
 ## 2. Product Scope
+
 ### In Scope (MVP)
-* **User Authentication:** Email & password-based signup, login, and logout powered by Firebase Auth.
-* **Dashboard / Main Screen:**
-  * Displays overall balance summary: "You owe ₹X" (coral) and "You are owed ₹Y" (emerald), using a net balance per person across all groups.
-  * Navigation links to Groups, Friends, Activity Log, and Balance Analytics.
-* **Group Management:**
-  * Create a group with a name, description, and group members.
-  * Add group members by searching for registered emails, or select from existing contacts.
-  * Auto-create "placeholder" users for non-registered email addresses. When a user registers with that email, they claim the placeholder history.
+* **User Authentication:** Email & password-based signup, login, and Google Sign-In (using the singleton `GoogleSignIn.instance.authenticate()` flow).
+* **Dashboard / Main Screen:** Displays overall balance summary: "You owe ₹X" (coral) and "You are owed ₹Y" (emerald), using a net balance per person across all groups, with quick shortcuts to notification feeds.
+* **Group Management:** Create groups with custom types (**Trip**, **Family**, **Self**, **No Expense**) and add members. Auto-create "placeholder" users for non-registered email/phone contacts, claiming history upon real profile registration.
 * **Direct 1-on-1 Expenses:** Create direct expenses with a friend outside of any group.
-* **Expense Management:**
-  * Add expenses inside a group or directly with a friend.
-  * Record details: description, amount, payer (who paid), date, and splits.
-  * Support multiple split strategies:
-    * **Equal:** Total divided evenly among selected members.
-    * **Exact:** Specify exact amounts owed per member (must sum to total).
-    * **Percentage:** Specify percentage owed per member (must sum to 100%).
-    * **Shares:** Specify share weights per member (e.g., Alice 2 shares, Bob 1 share).
-  * Soft delete expenses (mark as deleted to preserve audit trails). Editing/updating settled or partially settled expenses is disabled.
-* **Settle Up & Cross-Group Settlements:**
-  * Record a manual payment between two members.
-  * Options: Record as a virtual Cash payment, or simulate an Online (mock UPI/Netbanking) payment.
-  * **Settle Net Balance (Cross-Group):** Let users pay a net offset amount that the backend automatically distributes to outstanding mutual group debts.
-* **Balance & Debt Calculation:**
-  * On-the-fly balance calculation from raw expenses and settlements.
-  * **Debt Simplification Algorithm:** Greedy debt minimization (minimizes the total number of transactions required to settle up within a group).
-  * **Net Balance Per Person:** Automatically aggregates and nets balances for the same individual across all groups + direct friend debts.
-* **Multi-Currency Support:** Support INR, USD, EUR with custom rate settings.
-* **Analytics & Visuals:**
-  * Basic interactive charts for expenses inside a group (e.g., category-wise breakdown or over-time trend).
-  * Rich dashboard layout with glassmorphic cards, smooth micro-animations, and modern typography.
+* **Expense Management:** Add expenses inside a group or directly with a friend. Supports multiple split strategies (Equal, Exact, Shares, Percentage) and soft-deletion.
+* **Settle Up & Cross-Group Settlements:** Record cash/UPI settlements. Automatically distribute global settlements across mutual group debts first before direct debts.
+* **Group Notes:** Shared announcements visible to everyone in the group with author tags and timestamps.
+* **In-App Reminders:** Notify friends about outstanding balances, appearing with badge counts on a dashboard notification bell icon.
 
 ### Out of Scope
-* OCR / Receipt scanning.
-* Real-time payment gateway integration (mock UPI/cash settlement only).
-* Recurring expenses.
-* Real-time chat or comments on expenses.
-* Push/Email notifications.
+* Real payment gateway integration (UPI redirection/SMS launching are supported via WhatsApp mock templates).
+* OCR/Receipt scanning.
+* Real-time push notifications (replaced with local in-app activity logs).
 
 ---
 
-## 3. Implementation Decisions & Tech Stack
-* **Frontend Framework:** Flutter Web/Mobile (built with Flutter SDK 3.38.5, Dart 3.10.4).
-* **State Management:** Provider (simple, reactive, robust for MVPs).
-* **Backend & Database:** Firebase (Firebase Auth for authentication, Cloud Firestore for real-time relational-like data storage).
-* **Styling & Aesthetics:** Premium custom dark/light theme, Outfit/Inter typography, smooth gradients, custom painters for charts, and glassmorphism styling via Flutter's `BackdropFilter` and `BoxDecoration`.
-* **Deployment Plan:** Flutter Web built and hosted on Firebase Hosting (offering fast CDN, HTTPS, and seamless integration with the database/auth environment).
-* **Testing:** Manual browser verification and verification scripts.
+## 3. User Stories
+
+1. **Authentication:** As a user, I want to sign up with email/password or login via Google so that I can access my personalized dashboard.
+2. **Phone Linkage Onboarding:** As a new Google Sign-In user, I want to register my phone number during setup so that my historical placeholder transactions (created when friends invited me via my phone number) are claimed automatically.
+3. **Group Creation:** As a user, I want to create a group (Trip, Family, Self, or No Expense) and invite friends by email or phone so we can start logging expenses.
+4. **Expense Log:** As a group member, I want to add an expense with a description, amount, payer, and split strategy (Equal, Exact, Shares, Percentage) so that everyone's dues are calculated.
+5. **Group Notes:** As a group member, I want to pin important notes so that everyone in the group has visibility on key instructions.
+6. **Reminders:** As a creditor, I want to send an in-app balance reminder to a friend so that they are notified when they open their dashboard.
+7. **Settle Up:** As a debtor, I want to settle my net cross-group balance with a friend using Cash or Mock Online methods so that our balances resolve to zero.
 
 ---
 
-## 4. Database Schema (Firestore)
+## 4. Engineering Requirements
+
+### Functional
+- Math calculations must resolve split offsets to exactly two decimal places, charging the remainder of fractions to the last member in the split list.
+- All stored transactions must be converted into USD using active exchange rates for schema consistency, converting back to selected display currency in the UI.
+
+### Non-Functional
+- **Offline Cache:** Render groups and balances instantly on launch from SharedPreferences cache, pulling Firestore updates in the background.
+- **Visuals:** Follow a premium glassmorphic dark-mode palette utilizing subtle micro-animations, custom cartoon avatars, and Outfit/Inter typography.
+
+---
+
+## 5. Implementation Decisions & Tech Stack
+* **Frontend Framework:** Flutter SDK 3.38.5 / Dart 3.10.4.
+* **State Management:** Provider pattern with `AppProvider` managing lists, currency rates, loading overlays, and note states.
+* **Backend & Database:** Firebase Authentication + Cloud Firestore.
+* **Styling & Aesthetics:** Premium glassmorphic cards, custom painters for Donut charts, and Outfit typography.
+* **Deployment Plan:** Hosted on Firebase Hosting (Fast CDN, SSL configuration, domain mapping).
+
+---
+
+## 6. Frontend Structure
+```
+/lib
+  /models
+    - activity_model.dart
+    - expense_model.dart
+    - group_model.dart
+    - group_note_model.dart
+    - user_model.dart
+  /providers
+    - app_provider.dart
+    - auth_provider.dart
+  /screens
+    /auth
+      - login_screen.dart
+      - signup_screen.dart
+      - phone_setup_screen.dart
+    /dashboard
+      - dashboard_screen.dart
+      - activity_screen.dart
+      - notification_center_sheet.dart
+    /group
+      - group_detail_screen.dart
+      - create_group_screen.dart
+    /expense
+      - add_expense_screen.dart
+    /settlement
+      - settle_up_screen.dart
+  /services
+    - auth_service.dart
+    - db_service.dart
+    - debt_service.dart
+  /utils
+    - constants.dart
+    - invite_helper.dart
+  - main.dart
+```
+
+---
+
+## 7. Database Schema (Firestore)
 
 ### `users` (Collection)
 ```json
@@ -72,7 +112,8 @@ This document serves as the single source of truth for the project. It tracks pr
   "uid": "USER_UID_1",
   "email": "alice@example.com",
   "displayName": "Alice Smith",
-  "photoUrl": "https://...",
+  "photoUrl": "avatar:boy1",
+  "phone": "9876543210",
   "isPlaceholder": false,
   "createdAt": "TIMESTAMP"
 }
@@ -84,6 +125,7 @@ This document serves as the single source of truth for the project. It tracks pr
   "uid": "USER_UID_2",
   "email": "bob@example.com",
   "displayName": "Bob Jones",
+  "photoUrl": "avatar:girl2",
   "createdAt": "TIMESTAMP"
 }
 ```
@@ -98,17 +140,23 @@ This document serves as the single source of truth for the project. It tracks pr
   "createdAt": "TIMESTAMP",
   "members": ["USER_UID_1", "USER_UID_2"],
   "memberDetails": {
-    "USER_UID_1": {
-      "displayName": "Alice Smith",
-      "email": "alice@example.com",
-      "isPlaceholder": false
-    },
-    "USER_UID_2": {
-      "displayName": "Bob Jones",
-      "email": "bob@example.com",
-      "isPlaceholder": false
-    }
-  }
+    "USER_UID_1": { "displayName": "Alice Smith", "email": "alice@example.com", "isPlaceholder": false },
+    "USER_UID_2": { "displayName": "Bob Jones", "email": "bob@example.com", "isPlaceholder": false }
+  },
+  "type": "TRIP",
+  "deletedAt": null
+}
+```
+
+### `groups/{groupId}/notes` (Subcollection)
+```json
+{
+  "noteId": "NOTE_ID_1",
+  "groupId": "GROUP_ID_1",
+  "content": "Buy milk today",
+  "createdBy": "USER_UID_1",
+  "createdByName": "Alice Smith",
+  "createdAt": "TIMESTAMP"
 }
 ```
 
@@ -119,18 +167,12 @@ This document serves as the single source of truth for the project. It tracks pr
   "groupId": "GROUP_ID_1",
   "friendId": null,
   "description": "Electricity Bill",
-  "amount": 1200.00,
+  "amount": 12.63,
   "paidBy": "USER_UID_1",
   "splitType": "EQUAL",
   "splits": {
-    "USER_UID_1": {
-      "owedAmount": 600.00,
-      "exactValue": 600.00
-    },
-    "USER_UID_2": {
-      "owedAmount": 600.00,
-      "exactValue": 600.00
-    }
+    "USER_UID_1": { "owedAmount": 6.31, "exactValue": null },
+    "USER_UID_2": { "owedAmount": 6.32, "exactValue": null }
   },
   "isSettlement": false,
   "createdAt": "TIMESTAMP",
@@ -139,91 +181,63 @@ This document serves as the single source of truth for the project. It tracks pr
 }
 ```
 
-### `settlements` (Collection)
-```json
-{
-  "settlementId": "SETTLEMENT_ID_1",
-  "groupId": "GROUP_ID_1",
-  "friendId": null,
-  "payerId": "USER_UID_2",
-  "receiverId": "USER_UID_1",
-  "amount": 600.00,
-  "paymentMethod": "CASH",
-  "createdAt": "TIMESTAMP",
-  "deletedAt": null
-}
-```
+---
 
-### `activities` (Collection)
-```json
-{
-  "activityId": "ACTIVITY_ID_1",
-  "groupId": "GROUP_ID_1",
-  "friendId": null,
-  "activityType": "expense_add",
-  "userIds": ["USER_UID_1", "USER_UID_2"],
-  "actorId": "USER_UID_1",
-  "targetId": null,
-  "metadata": {
-    "description": "Dinner at Beach Cafe",
-    "amount": 1500.00,
-    "paidBy": "USER_UID_1",
-    "paidByName": "Alice Smith",
-    "groupName": "Goa Trip 2026 🌴"
-  },
-  "createdAt": "TIMESTAMP"
-}
-```
+## 8. API Design
+
+### `DbService` Interface
+- `Future<UserModel?> getUserProfile(String uid)`
+- `Future<void> claimPlaceholderHistory(String placeholderUid, String newRealUid)`
+- `Future<UserModel?> searchUserByPhone(String phone)`
+- `Future<UserModel?> searchUserByEmail(String email)`
+- `Future<List<GroupNoteModel>> getGroupNotes(String groupId)`
+- `Future<void> addGroupNote(GroupNoteModel note)`
+
+### `AppProvider` Interface
+- `Future<void> loadDashboardData(String currentUserId)`
+- `Future<void> addExpense(ExpenseModel expense, String currentUserId)`
+- `Future<void> settleUp({required String debtorId, required String creditorId, required double amount, String? groupId})`
+- `Future<void> addGroupNote(String groupId, String content, String userId, String userName)`
 
 ---
 
-## 5. Key Algorithms & Engineering Logic
-
-### Balance Calculation (On-The-Fly)
-To find the balance between users:
-1. Query active expenses (`deletedAt == null`) and settlements for the target context (group or direct friend).
-2. For each expense:
-   * Payer (`paidBy`) is credited the full `amount`.
-   * For each member in `splits`, they are debited the `owedAmount`.
-3. For each settlement:
-   * Payer (`payerId`) is credited the `amount`.
-   * Receiver (`receiverId`) is debited the `amount`.
-4. Net balance for user $U$ = $\sum \text{Credits} - \sum \text{Debits}$.
-
-### Debt Simplification Algorithm (Greedy Debt Minimizer)
-Given the net balances of all group members:
-1. Filter out users with zero net balance.
-2. Separate users into Creditors (net balance > 0) and Debtors (net balance < 0).
-3. While Creditors and Debtors list is not empty:
-   * Find the largest debtor $D$ (most negative balance) and largest creditor $C$ (most positive balance).
-   * Calculate transaction amount: $T = \min(|B_D|, B_C)$.
-   * Record that $D$ pays $C$ the amount $T$.
-   * $B_D \leftarrow B_D + T$.
-   * $B_C \leftarrow B_C - T$.
-   * Remove any user from list whose balance reaches 0.
-4. Return the list of simplified transactions.
+## 9. Deployment Plan
+1. **Firebase Configuration:** Setup Cloud Firestore rules and indexes.
+2. **Build Release Bundle:** Run `flutter build web --release`.
+3. **Firebase Hosting Deploy:** Initialize and deploy with `firebase deploy --only hosting`.
 
 ---
 
-## 6. Edge Cases & Safety Rules
-* **Rounding Errors:** When dividing $10.00 equally among 3 users:
-  * Splitting calculation: $10.00 / 3 = 3.3333...$
-  * User 1: 3.33, User 2: 3.33.
-  * The final (last) member gets charged the remainder: $10.00 - (3.33 + 3.33) = 3.34$.
-  * All splits are rounded to exactly 2 decimal places.
-* **Settled Expense Modification:** Editing an expense that is already settled (either fully or partially) is **disabled**.
-* **Leaving a Group:** A user cannot leave a group if they have a non-zero net balance (either they owe money or are owed money).
+## 10. Testing Plan
+
+### Unit Testing
+- Located in `/test/` directory. Run `flutter test`.
+- Algorithms under validation: Greedy debt simplification (`debt_service_test.dart`), splitting mathematics, cross-group settlements payment distribution, and group note creation (`group_notes_test.dart`).
+
+### Manual Testing
+- Google Sign-In cancellation checking (silently abort flow).
+- Case-insensitivity validation (input email in camel case `SajJan@Example.com` and verify history claim).
+- Phone number matching (invite with `+919876543210`, verify link with `9876543210`).
 
 ---
 
-## 7. Trade-offs & Limitations
-* **On-the-fly Computation:** Balance queries scale with the number of transactions. For a 3-day MVP, this avoids out-of-sync cache errors and simplifies the backend. If transaction volume becomes massive, we would implement aggregated/cached balances or Firestore Cloud Functions.
-* **Soft Deletes:** Deletes only mark `deletedAt = timestamp`. They are excluded from active calculations but remain in the database.
-* **No Real Payments:** Transactions are recorded manually or via simulated flow; no real UPI/Stripe integrations.
+## 11. Trade-Offs & Known Limitations
+- **Client-Side Calculations:** Balances computed dynamically on-the-fly to prevent database replication bugs. Can be slow with thousands of transactions.
+- **Offline Mode Fallback:** If Firebase is not configured, a setup warning displays prompting user validation before falling back to local Mock Mode.
+- **Web Contacts Fallback:** Native contacts sheets use iOS/Android permissions. On Desktop/Web build versions, the interface displays an inline custom text contacts selector.
 
 ---
 
-## 8. Development Timeline & Logs
+## 12. Prompts and AI Response Strategies
+When instructing the AI assistant, follow these prompt formats:
+- **Refinement Prompts:** *"Refactor [file] to add [feature] using the Provider pattern, checking for compilation correctness at the end."*
+- **Error Resolution Prompts:** *"During Google Sign-In, cancellation exception [code] is showing on screen. Silence this error in [file] and return null."*
+- **Aesthetic Direction:** *"Redesign the notes display card inside the bottom sheet to match the dark glassmorphism theme, adding 5px padding and 0.05 opacity."*
+
+---
+
+## 13. Development Timeline & Logs
+
 * **2026-05-29 (Scoping):** Initial project interview completed. Requirements and scoping finalized. Firebase and Flutter selected. AI_CONTEXT.md initialized.
 * **2026-05-29 (Execution):** Completed full Flutter app structure with local/mock DB fallback. Upgraded Firebase dependency constraints to major versions (`firebase_core: ^4.9.0`, `firebase_auth: ^6.5.1`, `cloud_firestore: ^6.4.1`) to resolve static web compilation mismatches. Successfully ran the full test suite with 9 passing tests (algorithms + widget smoke checks) and compiled release build for production web (`build/web`).
 * **2026-05-29 (Expansion):** Implemented pairwise dues display on Settle Up page featuring real-time direct/simplified balance summaries and Autofill "Use this" action. Added a bottom navigation bar layout dividing Groups, Friends, Activity Feed, and Account settings. Implemented native Splitwise-looking Activity feed screen with custom avatars, action-type stacked corner badges, bold names, and colored ledger impact status lines. Verified compilation, passing test suite (9/9), and completed static production web release build.
