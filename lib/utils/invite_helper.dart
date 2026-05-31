@@ -6,7 +6,7 @@ class InviteHelper {
   static Future<void> launchEmailInvite(String email, {String? groupName}) async {
     final groupText = groupName != null ? ' to the group "$groupName"' : '';
     final subject = Uri.encodeComponent('Join me on Splitwise!');
-    final body = Uri.encodeComponent('Hey, I have added you$groupText on our Splitwise app. Please register to view and settle your expenses!');
+    final body = Uri.encodeComponent('Hey, I have added you$groupText on our Splitwise app. Please register at https://splitwise-3fcdd.web.app to view and settle your expenses!');
     final url = Uri.parse('mailto:$email?subject=$subject&body=$body');
     try {
       await launchUrl(url);
@@ -17,7 +17,7 @@ class InviteHelper {
 
   static Future<void> launchWhatsAppInvite(String phone, {String? groupName}) async {
     final groupText = groupName != null ? ' to the group "$groupName"' : '';
-    final body = Uri.encodeComponent('Hey, I have added you$groupText on our Splitwise app. Please register to view and settle your expenses!');
+    final body = Uri.encodeComponent('Hey, I have added you$groupText on our Splitwise app. Please register at https://splitwise-3fcdd.web.app to view and settle your expenses!');
     
     var cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
     if (cleanPhone.length == 10) {
@@ -35,7 +35,7 @@ class InviteHelper {
   static void showInviteChannelsDialog(BuildContext context, String emailOrPhone, {String? groupName}) {
     final isEmail = emailOrPhone.contains('@');
     final groupText = groupName != null ? ' to the group "$groupName"' : '';
-    final messagePreview = 'Hey, I have added you$groupText on our Splitwise app. Please register to view and settle your expenses!';
+    final messagePreview = 'Hey, I have added you$groupText on our Splitwise app. Please register at https://splitwise-3fcdd.web.app to view and settle your expenses!';
 
     showDialog(
       context: context,

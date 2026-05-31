@@ -322,40 +322,69 @@ class AppProvider extends ChangeNotifier {
     await initLastViewedReminders(currentUserId);
 
     try {
-      // Self-healing database check: claim any placeholder records matching the current user's profile
-      final currentUserProfile = await _dbService.getUserProfile(currentUserId);
+      // Fetch user profile, groups, friends, and activities in parallel
+      final userProfileFuture = _dbService.getUserProfile(currentUserId);
+      final groupsFuture = _dbService.getGroupsForUser(currentUserId);
+      final friendsFuture = _dbService.getFriends(currentUserId);
+      final activitiesFuture = _dbService.getActivities(currentUserId);
+
+      final coreResults = await Future.wait([
+        userProfileFuture,
+        groupsFuture,
+        friendsFuture,
+        activitiesFuture,
+      ]);
+
+      final currentUserProfile = coreResults[0] as UserModel?;
+      _groups = coreResults[1] as List<GroupModel>;
+      _friends = coreResults[2] as List<UserModel>;
+      final rawActs = coreResults[3] as List<ActivityModel>;
+
+      // Self-healing database check (non-blocking in background)
       if (currentUserProfile != null) {
-        final placeholder = await _dbService.findPlaceholderForEmailOrPhone(
+        _dbService.findPlaceholderForEmailOrPhone(
           currentUserProfile.email,
           currentUserProfile.phone,
-        );
-        if (placeholder != null && placeholder.uid != currentUserId) {
-          await _dbService.claimPlaceholderHistory(placeholder.uid, currentUserId);
-        }
+        ).then((placeholder) {
+          if (placeholder != null && placeholder.uid != currentUserId) {
+            _dbService.claimPlaceholderHistory(placeholder.uid, currentUserId).then((_) {
+              // Reload dashboard data in background silently if healing occurred
+              loadDashboardData(currentUserId);
+            });
+          }
+        }).catchError((e) {
+          debugPrint("Self-healing background check failed: $e");
+        });
       }
 
-      _groups = await _dbService.getGroupsForUser(currentUserId);
-      _friends = await _dbService.getFriends(currentUserId);
-
-      // Pre-load expenses to compute overall summary
+      // Pre-load expenses to compute overall summary in parallel
       _groupExpenses.clear();
       _directExpenses.clear();
 
+      final List<Future<void>> expenseFetchFutures = [];
+
       for (var group in _groups) {
-        final exps = await _dbService.getExpenses(groupId: group.groupId);
-        _groupExpenses[group.groupId] = exps.map((e) => _convertExpenseToSelected(e)).toList();
+        expenseFetchFutures.add(
+          _dbService.getExpenses(groupId: group.groupId).then((exps) {
+            _groupExpenses[group.groupId] = exps.map((e) => _convertExpenseToSelected(e)).toList();
+          })
+        );
       }
 
       for (var friend in _friends) {
-        final exps = await _dbService.getExpenses(
-          currentUserId: currentUserId,
-          friendId: friend.uid,
+        expenseFetchFutures.add(
+          _dbService.getExpenses(
+            currentUserId: currentUserId,
+            friendId: friend.uid,
+          ).then((exps) {
+            _directExpenses[friend.uid] = exps.map((e) => _convertExpenseToSelected(e)).toList();
+          })
         );
-        _directExpenses[friend.uid] = exps.map((e) => _convertExpenseToSelected(e)).toList();
       }
 
+      await Future.wait(expenseFetchFutures);
+
       _recalculateOverallBalances(currentUserId);
-      final rawActs = await _dbService.getActivities(currentUserId);
       _activities = rawActs.map((a) => _convertActivityToSelected(a)).toList();
 
       // Save fresh data to local cache

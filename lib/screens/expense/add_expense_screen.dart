@@ -334,7 +334,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      flex: 2,
                       child: TextFormField(
                         controller: _descriptionController,
                         focusNode: _descriptionFocusNode,
@@ -354,6 +353,25 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         validator: (value) => (value == null || value.trim().isEmpty) ? 'Enter description' : null,
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 56,
+                      width: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.02),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      ),
+                      child: const Icon(
+                        Icons.payments_outlined,
+                        color: AppConstants.accentTeal,
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextFormField(
@@ -362,7 +380,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         style: const TextStyle(color: AppConstants.textPrimary),
                         decoration: InputDecoration(
-                          hintText: AppConstants.currencySymbol,
+                          hintText: 'Amount (${AppConstants.currencySymbol})',
                           hintStyle: const TextStyle(color: AppConstants.textSecondary),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -373,7 +391,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                             borderSide: const BorderSide(color: AppConstants.accentTeal),
                           ),
                         ),
-                        validator: (value) => (value == null || double.tryParse(value) == null) ? 'Enter number' : null,
+                        validator: (value) => (value == null || double.tryParse(value) == null) ? 'Enter amount' : null,
                         onChanged: (_) {
                           setState(() {});
                         },
