@@ -950,42 +950,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
         border: Border.all(color: Colors.white.withOpacity(0.04)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('TOTAL BALANCE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppConstants.textSecondary, letterSpacing: 1)),
-              const SizedBox(height: 2),
-              Text(
-                '${appProv.overallNet >= 0 ? "+" : ""}${AppConstants.currencySymbol}${appProv.overallNet.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: appProv.overallNet >= 0 ? AppConstants.creditGreen : AppConstants.debitOrange,
+          Expanded(
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('TOTAL BALANCE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppConstants.textSecondary, letterSpacing: 1)),
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${appProv.overallNet >= 0 ? "+" : ""}${AppConstants.currencySymbol}${appProv.overallNet.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: appProv.overallNet >= 0 ? AppConstants.creditGreen : AppConstants.debitOrange,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          Row(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text('Owed', style: TextStyle(fontSize: 9, color: AppConstants.textSecondary)),
-                  Text('${AppConstants.currencySymbol}${appProv.overallOwed.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppConstants.creditGreen, fontSize: 12)),
-                ],
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text('Owe', style: TextStyle(fontSize: 9, color: AppConstants.textSecondary)),
-                  Text('${AppConstants.currencySymbol}${appProv.overallOwe.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppConstants.debitOrange, fontSize: 12)),
-                ],
-              ),
-            ],
-          )
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text('Owed', style: TextStyle(fontSize: 9, color: AppConstants.textSecondary)),
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${AppConstants.currencySymbol}${appProv.overallOwed.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppConstants.creditGreen, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text('Owe', style: TextStyle(fontSize: 9, color: AppConstants.textSecondary)),
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${AppConstants.currencySymbol}${appProv.overallOwe.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppConstants.debitOrange, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

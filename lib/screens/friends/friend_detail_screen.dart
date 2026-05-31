@@ -503,56 +503,49 @@ class FriendDetailScreen extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 3),
-                Row(
-                  children: [
-                    if (groupName != null) ...[
-                      const Icon(Icons.folder_outlined, size: 11, color: AppConstants.textSecondary),
-                      const SizedBox(width: 3),
-                      Text(
-                        groupName,
-                        style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Text(
-                      isSelf ? 'You paid' : 'They paid',
-                      style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '• ${_formatDate(exp.createdAt)}',
-                      style: const TextStyle(color: Colors.white24, fontSize: 11),
-                    ),
-                  ],
+                Text(
+                  '${groupName != null ? "$groupName • " : ""}${isSelf ? "You paid" : "They paid"} • ${_formatDate(exp.createdAt)}',
+                  style: const TextStyle(color: AppConstants.textSecondary, fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
 
           // Amount
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${AppConstants.currencySymbol}${exp.amount.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  color: AppConstants.textPrimary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
-              ),
-              if (!isSettlement && userSplit > 0)
-                Text(
-                  isSelf ? '+${AppConstants.currencySymbol}${(exp.amount - userSplit).toStringAsFixed(0)}' : '-${AppConstants.currencySymbol}${userSplit.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    color: isSelf ? AppConstants.creditGreen : AppConstants.debitOrange,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+          SizedBox(
+            width: 90,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${AppConstants.currencySymbol}${exp.amount.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      color: AppConstants.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
                   ),
                 ),
-            ],
+                if (!isSettlement && userSplit > 0)
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      isSelf ? '+${AppConstants.currencySymbol}${(exp.amount - userSplit).toStringAsFixed(0)}' : '-${AppConstants.currencySymbol}${userSplit.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        color: isSelf ? AppConstants.creditGreen : AppConstants.debitOrange,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),

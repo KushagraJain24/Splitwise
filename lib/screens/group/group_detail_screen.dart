@@ -552,32 +552,43 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> with SingleTicker
                   ),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${AppConstants.currencySymbol}${exp.amount.toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                    ),
-                    const SizedBox(height: 2),
-                    if (!exp.isSettlement)
-                      Text(
-                        isSelfPayer
-                            ? 'you lent ${AppConstants.currencySymbol}${(exp.amount - myShare).toStringAsFixed(2)}'
-                            : isParticipant
-                                ? 'you owe ${AppConstants.currencySymbol}${myShare.toStringAsFixed(2)}'
-                                : 'not involved',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: isSelfPayer
-                              ? AppConstants.creditGreen
-                              : isParticipant
-                                  ? AppConstants.debitOrange
-                                  : AppConstants.textSecondary,
+                SizedBox(
+                  width: 100,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          '${AppConstants.currencySymbol}${exp.amount.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 2),
+                      if (!exp.isSettlement)
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            isSelfPayer
+                                ? 'you lent ${AppConstants.currencySymbol}${(exp.amount - myShare).toStringAsFixed(2)}'
+                                : isParticipant
+                                    ? 'you owe ${AppConstants.currencySymbol}${myShare.toStringAsFixed(2)}'
+                                    : 'not involved',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isSelfPayer
+                                  ? AppConstants.creditGreen
+                                  : isParticipant
+                                      ? AppConstants.debitOrange
+                                      : AppConstants.textSecondary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 const SizedBox(width: 4),
                 IconButton(
@@ -1077,8 +1088,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> with SingleTicker
                   return StatefulBuilder(
                     builder: (context, setFriendsState) {
                       final filteredFriends = appProvider.friends.where((f) {
-                        final inGroup = group.members.contains(f.uid);
+                        final inGroup = group.members.contains(f.uid) || group.memberDetails.values.any((d) => d.email.toLowerCase() == f.email.toLowerCase());
                         if (inGroup) return false;
+                        final isAlreadyStaged = newMembers.any((m) => m.email.toLowerCase() == f.email.toLowerCase() && m.uid != f.uid);
+                        if (isAlreadyStaged) return false;
+
                         final matchQuery = f.displayName.toLowerCase().contains(query.toLowerCase()) ||
                             f.email.toLowerCase().contains(query.toLowerCase());
                         return matchQuery;
@@ -1363,56 +1377,76 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> with SingleTicker
 
   void _showInviteDialogForGroup(BuildContext parentCtx, String email, String groupName, Function(UserModel) onInvited) {
     final nameController = TextEditingController();
+    bool isSavingLocal = false;
     showDialog(
       context: parentCtx,
+      barrierDismissible: false,
       builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: AppConstants.cardDark,
-          title: const Text('Invite Friend', style: TextStyle(color: AppConstants.textPrimary)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'This email/phone ($email) is not registered yet. Invite them as a placeholder member so they can be added to your group!',
-                style: const TextStyle(color: AppConstants.textSecondary, fontSize: 13),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppConstants.cardDark,
+              title: const Text('Invite Friend', style: TextStyle(color: AppConstants.textPrimary)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'This email/phone ($email) is not registered yet. Invite them as a placeholder member so they can be added to your group!',
+                    style: const TextStyle(color: AppConstants.textSecondary, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  if (isSavingLocal)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20.0),
+                        child: CircularProgressIndicator(color: AppConstants.accentTeal),
+                      ),
+                    )
+                  else
+                    TextField(
+                      controller: nameController,
+                      style: const TextStyle(color: AppConstants.textPrimary),
+                      decoration: const InputDecoration(
+                        labelText: 'Friend Full Name',
+                        labelStyle: TextStyle(color: AppConstants.textSecondary),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameController,
-                style: const TextStyle(color: AppConstants.textPrimary),
-                decoration: const InputDecoration(
-                  labelText: 'Friend Full Name',
-                  labelStyle: TextStyle(color: AppConstants.textSecondary),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-              },
-              child: const Text('Cancel', style: TextStyle(color: AppConstants.textSecondary)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.accentTeal, foregroundColor: Colors.black),
-              onPressed: () async {
-                final name = nameController.text.trim();
-                if (name.isEmpty) return;
+              actions: isSavingLocal
+                  ? []
+                  : [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text('Cancel', style: TextStyle(color: AppConstants.textSecondary)),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.accentTeal, foregroundColor: Colors.black),
+                        onPressed: () async {
+                          final name = nameController.text.trim();
+                          if (name.isEmpty) return;
 
-                final currentUserId = context.read<AuthProvider>().user!.uid;
-                final placeholder = await context.read<AppProvider>().inviteUser(email, name, currentUserId);
+                          setDialogState(() {
+                            isSavingLocal = true;
+                          });
 
-                onInvited(placeholder);
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                  InviteHelper.showInviteChannelsDialog(context, email, groupName: groupName);
-                }
-              },
-              child: const Text('Invite & Add'),
-            ),
-          ],
+                          final currentUserId = context.read<AuthProvider>().user!.uid;
+                          final placeholder = await context.read<AppProvider>().inviteUser(email, name, currentUserId);
+
+                          onInvited(placeholder);
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                            InviteHelper.showInviteChannelsDialog(context, email, groupName: groupName);
+                          }
+                        },
+                        child: const Text('Invite & Add'),
+                      ),
+                    ],
+            );
+          },
         );
       },
     );

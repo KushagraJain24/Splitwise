@@ -633,10 +633,40 @@ class DbService {
         }
         return f;
       }));
-      return updatedList;
+
+      // Deduplicate by email, preferring the non-placeholder user if duplicates exist
+      final Map<String, UserModel> uniqueFriends = {};
+      for (var f in updatedList) {
+        final emailKey = f.email.toLowerCase().trim();
+        if (emailKey.isEmpty) continue;
+        if (!uniqueFriends.containsKey(emailKey)) {
+          uniqueFriends[emailKey] = f;
+        } else {
+          final existing = uniqueFriends[emailKey]!;
+          if (existing.isPlaceholder && !f.isPlaceholder) {
+            uniqueFriends[emailKey] = f;
+          }
+        }
+      }
+      return uniqueFriends.values.toList();
     } else {
       final list = mockFriends[currentUserId] ?? [];
-      return list.map((f) => mockUsers[f.uid] ?? f).toList();
+      final resolvedList = list.map((f) => mockUsers[f.uid] ?? f).toList();
+
+      final Map<String, UserModel> uniqueFriends = {};
+      for (var f in resolvedList) {
+        final emailKey = f.email.toLowerCase().trim();
+        if (emailKey.isEmpty) continue;
+        if (!uniqueFriends.containsKey(emailKey)) {
+          uniqueFriends[emailKey] = f;
+        } else {
+          final existing = uniqueFriends[emailKey]!;
+          if (existing.isPlaceholder && !f.isPlaceholder) {
+            uniqueFriends[emailKey] = f;
+          }
+        }
+      }
+      return uniqueFriends.values.toList();
     }
   }
 

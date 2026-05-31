@@ -777,6 +777,14 @@ class AppProvider extends ChangeNotifier {
     _isSaving = true;
     notifyListeners();
     try {
+      // Check if user already exists globally in DB (users collection) first
+      final dbUser = await _dbService.searchUserByEmail(sanitizedEmail);
+      if (dbUser != null) {
+        await _dbService.addFriend(currentUserId, dbUser);
+        await loadDashboardData(currentUserId);
+        return dbUser;
+      }
+
       final placeholder = await _dbService.createPlaceholderUser(email, displayName);
       await _dbService.addFriend(currentUserId, placeholder);
       await loadDashboardData(currentUserId);

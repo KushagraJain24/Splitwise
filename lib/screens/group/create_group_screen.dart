@@ -83,63 +83,83 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   void _showInviteDialog(String email) {
     final nameController = TextEditingController();
+    bool isSavingLocal = false;
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: AppConstants.cardDark,
-          title: const Text('Invite Friend', style: TextStyle(color: AppConstants.textPrimary)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'This email/phone ($email) is not registered yet. Invite them as a placeholder member so they can be added to your group!',
-                style: const TextStyle(color: AppConstants.textSecondary, fontSize: 13),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppConstants.cardDark,
+              title: const Text('Invite Friend', style: TextStyle(color: AppConstants.textPrimary)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'This email/phone ($email) is not registered yet. Invite them as a placeholder member so they can be added to your group!',
+                    style: const TextStyle(color: AppConstants.textSecondary, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  if (isSavingLocal)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20.0),
+                        child: CircularProgressIndicator(color: AppConstants.accentTeal),
+                      ),
+                    )
+                  else
+                    TextField(
+                      controller: nameController,
+                      style: const TextStyle(color: AppConstants.textPrimary),
+                      decoration: const InputDecoration(
+                        labelText: 'Friend Full Name',
+                        labelStyle: TextStyle(color: AppConstants.textSecondary),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameController,
-                style: const TextStyle(color: AppConstants.textPrimary),
-                decoration: const InputDecoration(
-                  labelText: 'Friend Full Name',
-                  labelStyle: TextStyle(color: AppConstants.textSecondary),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                setState(() => _isSearching = false);
-                Navigator.pop(ctx);
-              },
-              child: const Text('Cancel', style: TextStyle(color: AppConstants.textSecondary)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppConstants.accentTeal, foregroundColor: Colors.black),
-              onPressed: () async {
-                final name = nameController.text.trim();
-                if (name.isEmpty) return;
+              actions: isSavingLocal
+                  ? []
+                  : [
+                      TextButton(
+                        onPressed: () {
+                          setState(() => _isSearching = false);
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text('Cancel', style: TextStyle(color: AppConstants.textSecondary)),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: AppConstants.accentTeal, foregroundColor: Colors.black),
+                        onPressed: () async {
+                          final name = nameController.text.trim();
+                          if (name.isEmpty) return;
 
-                final currentUserId = context.read<AuthProvider>().user!.uid;
-                final placeholder = await context.read<AppProvider>().inviteUser(email, name, currentUserId);
+                          setDialogState(() {
+                            isSavingLocal = true;
+                          });
 
-                setState(() {
-                  _selectedMembers.add(placeholder);
-                  _emailController.clear();
-                  _isSearching = false;
-                });
+                          final currentUserId = context.read<AuthProvider>().user!.uid;
+                          final placeholder = await context.read<AppProvider>().inviteUser(email, name, currentUserId);
 
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                  final gName = _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null;
-                  InviteHelper.showInviteChannelsDialog(context, email, groupName: gName);
-                }
-              },
-              child: const Text('Invite & Add'),
-            ),
-          ],
+                          setState(() {
+                            _selectedMembers.add(placeholder);
+                            _emailController.clear();
+                            _isSearching = false;
+                          });
+
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                            final gName = _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null;
+                            InviteHelper.showInviteChannelsDialog(context, email, groupName: gName);
+                          }
+                        },
+                        child: const Text('Invite & Add'),
+                      ),
+                    ],
+            );
+          },
         );
       },
     );
@@ -464,8 +484,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            // Exclude current user and filter by query
+            // Exclude friends whose emails are already selected in group members list
             final filteredFriends = appProv.friends.where((f) {
+              final isEmailAlreadySelectedByAnother = _selectedMembers.any((m) => m.email.toLowerCase() == f.email.toLowerCase() && m.uid != f.uid);
+              if (isEmailAlreadySelectedByAnother) return false;
+
               final matchQuery = f.displayName.toLowerCase().contains(query.toLowerCase()) ||
                   f.email.toLowerCase().contains(query.toLowerCase());
               return matchQuery;
